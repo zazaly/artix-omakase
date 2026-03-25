@@ -38,6 +38,7 @@ This project uses a 3-stage workflow:
    - Applies hostname, locale, keymap, timezone
    - Initializes pacman keyring
    - Installs packages from `config.toml`
+   - Clones/builds/installs `dmenu`, `st`, and `dwm` from bakkeby flexipatch repos
    - Installs and configures GRUB for UEFI
    - Enables OpenRC services (NetworkManager, lightdm, sshd)
    - Creates user, sets passwords, sudo policy
@@ -88,6 +89,7 @@ This project uses a 3-stage workflow:
 
 - If `pacman-key` initialization is slow, wait (entropy in VMs can delay this).
 - If package conflicts appear around X server components, keep replacement prompts at defaults (XLibre should replace Xorg where needed).
+- If your display manager session list does not show `dwm`, log in on tty and run `startx` once to validate `.xinitrc`.
 - If boot fails, re-open live ISO and verify EFI partition mount and GRUB files in `/boot/grub`.
 
 ## License
