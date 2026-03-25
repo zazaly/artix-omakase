@@ -27,7 +27,7 @@ trap 'on_error $LINENO' ERR
 
 check_chroot_environment() {
   require_root
-  for cmd in pacman pacman-key locale-gen ln hwclock grub-install grub-mkconfig rc-update useradd chpasswd awk; do
+  for cmd in pacman pacman-key locale-gen ln hwclock grub-install grub-mkconfig rc-update useradd chpasswd awk git make; do
     need_cmd "$cmd"
   done
   [[ -f "$CONFIG_FILE" ]] || die "Missing $CONFIG_FILE"
@@ -129,6 +129,39 @@ install_packages_from_config() {
   log_ok "XLibre + AMD userspace stack verified"
 }
 
+install_suckless_stack() {
+  local repos=(
+    "https://github.com/bakkeby/dmenu-flexipatch"
+    "https://github.com/bakkeby/st-flexipatch"
+    "https://github.com/bakkeby/dwm-flexipatch"
+  )
+  local workdir="/usr/local/src/suckless-flexipatch"
+  local repo name
+
+  log_info "Building and installing suckless tools (dmenu, st, dwm)"
+  install -d -m 0755 "$workdir"
+
+  for repo in "${repos[@]}"; do
+    name="${repo##*/}"
+    if [[ -d "${workdir}/${name}/.git" ]]; then
+      log_info "Refreshing existing repo: ${name}"
+      git -C "${workdir}/${name}" pull --ff-only
+    else
+      log_info "Cloning repo: ${name}"
+      git clone --depth 1 "$repo" "${workdir}/${name}"
+    fi
+
+    make -C "${workdir}/${name}" clean
+    make -C "${workdir}/${name}"
+    make -C "${workdir}/${name}" install
+  done
+
+  command -v dmenu >/dev/null 2>&1 || die "dmenu install verification failed"
+  command -v st >/dev/null 2>&1 || die "st install verification failed"
+  command -v dwm >/dev/null 2>&1 || die "dwm install verification failed"
+  log_ok "Suckless toolchain installed"
+}
+
 configure_bootloader() {
   log_info "Refreshing /etc/fstab"
   fstabgen -U / > /etc/fstab
@@ -178,6 +211,13 @@ create_user_and_passwords() {
   # Place post-install script in user's home for stage 3 convenience.
   install -m 0755 /root/post-install.sh "/home/${USERNAME}/post-install.sh"
   chown "$USERNAME:$USERNAME" "/home/${USERNAME}/post-install.sh"
+
+  cat > "/home/${USERNAME}/.xinitrc" <<'XINIT'
+#!/bin/sh
+exec dwm
+XINIT
+  chmod 0755 "/home/${USERNAME}/.xinitrc"
+  chown "$USERNAME:$USERNAME" "/home/${USERNAME}/.xinitrc"
 }
 
 cleanup() {
@@ -192,6 +232,7 @@ main() {
   configure_system_basics
   initialize_pacman
   install_packages_from_config
+  install_suckless_stack
   configure_bootloader
   enable_services
   configure_privilege_escalation

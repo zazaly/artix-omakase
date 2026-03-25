@@ -65,11 +65,13 @@ drivers = [
 ]
 
 # Session/basic desktop quality-of-life pieces
+# We intentionally ship a minimal suckless desktop stack and build
+# dwm/dmenu/st from source during chroot stage.
 desktop = [
   "xorg-xinit",
-  "xfce4",
-  "xfce4-goodies",
-  "alacritty"
+  "libx11",
+  "libxft",
+  "libxinerama"
 ]
 
 # Everyday command-line tools/utilities
