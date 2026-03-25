@@ -1,0 +1,88 @@
+# Omakase Artix package manifest (TOML)
+#
+# Notes:
+# - Keep package names quoted and comma-separated.
+# - Each list is merged by scripts into one install set.
+# - Safe to add/remove packages before installation.
+
+# Base system and firmware essentials
+base = [
+  "base",
+  "base-devel",
+  "linux-firmware",
+  "elogind",
+  "openrc",
+  "openrc-base"
+]
+
+# Kernel stack (Zen kernel as requested)
+kernel = [
+  "linux-zen",
+  "linux-zen-headers"
+]
+
+# Bootloader and EFI tooling
+bootloader = [
+  "grub",
+  "efibootmgr"
+]
+
+# Networking, remote access, and core connectivity
+network = [
+  "networkmanager",
+  "networkmanager-openrc",
+  "openssh",
+  "wpa_supplicant",
+  "dhcpcd"
+]
+
+# Display manager stack
+# lightdm-openrc provides OpenRC service integration.
+display = [
+  "lightdm",
+  "lightdm-gtk-greeter",
+  "lightdm-openrc"
+]
+
+# XLibre server stack (replaces classic Xorg server components)
+# Keep these together to avoid mixed Xorg/XLibre conflicts.
+xlibre = [
+  "xlibre-xserver",
+  "xlibre-xserver-common",
+  "xlibre-video-amdgpu",
+  "xlibre-video-ati",
+  "xlibre-video-vesa",
+  "xlibre-video-fbdev",
+  "xlibre-input-libinput"
+]
+
+# AMD graphics and Vulkan userspace (including 32-bit libs for Steam/Wine-like apps)
+drivers = [
+  "mesa",
+  "vulkan-radeon",
+  "lib32-mesa",
+  "lib32-vulkan-radeon"
+]
+
+# Session/basic desktop quality-of-life pieces
+desktop = [
+  "xorg-xinit",
+  "xfce4",
+  "xfce4-goodies",
+  "alacritty"
+]
+
+# Everyday command-line tools/utilities
+utils = [
+  "sudo",
+  "doas",
+  "git",
+  "curl",
+  "wget",
+  "yt-dlp",
+  "nano",
+  "bash-completion",
+  "man-db",
+  "man-pages",
+  "less"
+]

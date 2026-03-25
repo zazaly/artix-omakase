@@ -1,0 +1,10 @@
+{
+  "username": "oz",
+  "hostname": "desktop",
+  "root_password": "wizard",
+  "user_password": "wizard",
+  "timezone": "America/New_York",
+  "locale": "en_US.UTF-8",
+  "keymap": "us",
+  "additional_packages": []
+}
