@@ -1,0 +1,13 @@
+# Local installer runtime files
+settings.json
+*.log
+
+# Temporary artifacts
+*.tmp
+*.swp
+*~
+
+# Editor/OS
+.DS_Store
+.vscode/
+.idea/
