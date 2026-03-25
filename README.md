@@ -27,8 +27,8 @@ This project uses a 3-stage workflow:
    - Lists disks and prompts for target
    - Destroys partition table on target (after explicit confirmation)
    - Creates GPT layout:
-     - `BOOT` 1 GiB (FAT32, `/boot`)
-     - `ROOT` 40 GiB (ext4, `/`)
+     - `BOOT` size from `settings.json` key `boot_part_size` (default `1GiB`) (FAT32, `/boot`)
+     - `ROOT` size from `settings.json` key `root_part_size` (default `40GiB`) (ext4, `/`)
      - `HOME` remaining (ext4, `/home`)
    - Mounts target filesystem tree
    - Installs base system with `basestrap`
@@ -69,7 +69,9 @@ This project uses a 3-stage workflow:
 
 ## Customization
 
-- Edit **`settings.json`** for identity and locale values.
+- Edit **`settings.json`** for identity, locale, and partition size values:
+  - `boot_part_size` (default `1GiB`)
+  - `root_part_size` (default `40GiB`)
 - Edit **`config.toml`** to add/remove package groups.
 - Add packages at install time via:
   - `settings.json` → `additional_packages`

@@ -6,5 +6,7 @@
   "timezone": "America/New_York",
   "locale": "en_US.UTF-8",
   "keymap": "us",
+  "boot_part_size": "1GiB",
+  "root_part_size": "40GiB",
   "additional_packages": []
 }

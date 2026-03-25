@@ -16,6 +16,8 @@ TARGET_DRIVE=""
 EFI_PART=""
 ROOT_PART=""
 HOME_PART=""
+BOOT_PART_SIZE="1GiB"
+ROOT_PART_SIZE="40GiB"
 
 on_error() {
   local code=$?
@@ -50,6 +52,8 @@ load_or_prompt_settings() {
   local default_timezone="America/New_York"
   local default_locale="en_US.UTF-8"
   local default_keymap="us"
+  local default_boot_part_size="1GiB"
+  local default_root_part_size="40GiB"
 
   if [[ -f "$SETTINGS_FILE" ]]; then
     log_ok "Found settings file: $SETTINGS_FILE"
@@ -81,6 +85,8 @@ load_or_prompt_settings() {
   "timezone": "${timezone}",
   "locale": "${locale}",
   "keymap": "${keymap}",
+  "boot_part_size": "${default_boot_part_size}",
+  "root_part_size": "${default_root_part_size}",
   "additional_packages": []
 }
 JSON
@@ -88,6 +94,12 @@ JSON
     log_ok "Wrote settings template to: $SETTINGS_FILE"
     cp -n "$SETTINGS_FILE" "$SETTINGS_EXAMPLE" || true
   fi
+
+  BOOT_PART_SIZE="$(json_get_string "$SETTINGS_FILE" "boot_part_size")"
+  ROOT_PART_SIZE="$(json_get_string "$SETTINGS_FILE" "root_part_size")"
+  BOOT_PART_SIZE="${BOOT_PART_SIZE:-$default_boot_part_size}"
+  ROOT_PART_SIZE="${ROOT_PART_SIZE:-$default_root_part_size}"
+  log_info "Partition sizes from settings: BOOT=${BOOT_PART_SIZE}, ROOT=${ROOT_PART_SIZE}, HOME=remaining"
 }
 
 show_disks_and_choose() {
@@ -113,8 +125,8 @@ partition_drive() {
   sgdisk --zap-all "$TARGET_DRIVE"
 
   log_info "Creating GPT partitions"
-  sgdisk -n 1:1MiB:+1GiB -t 1:EF00 -c 1:BOOT "$TARGET_DRIVE"
-  sgdisk -n 2:0:+40GiB -t 2:8300 -c 2:ROOT "$TARGET_DRIVE"
+  sgdisk -n 1:1MiB:+"${BOOT_PART_SIZE}" -t 1:EF00 -c 1:BOOT "$TARGET_DRIVE"
+  sgdisk -n 2:0:+"${ROOT_PART_SIZE}" -t 2:8300 -c 2:ROOT "$TARGET_DRIVE"
   sgdisk -n 3:0:0 -t 3:8300 -c 3:HOME "$TARGET_DRIVE"
   partprobe "$TARGET_DRIVE" || true
 
