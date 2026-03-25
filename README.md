@@ -56,20 +56,14 @@ This project uses a 3-stage workflow:
    - CPU: 2+ vCPUs
 3. Boot ISO and open a root shell.
 4. Copy this repo into the live environment (USB/shared folder/git clone).
-5. Prepare settings:
+5. Run installer:
    ```bash
-   cp settings.json.example settings.json
-   nano settings.json
-   ```
-6. Run installer:
-   ```bash
-   chmod +x install.sh chroot.sh post-install.sh
+   chmod +x *.sh
    ./install.sh
    ```
-7. Reboot into installed system.
-8. Log in as your configured user and run:
+6. Reboot into installed system.
+7. Log in as your configured user and run:
    ```bash
-   chmod +x ~/post-install.sh
    ~/post-install.sh
    ```
 
