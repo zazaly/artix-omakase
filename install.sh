@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Stage 1 installer: run in Artix live environment as root.
-# Performs destructive disk partitioning, filesystems, basestrap, and chroot handoff.
+# Stage 1 installer: run in Gentoo live environment as root.
+# Performs destructive disk partitioning, filesystems, stage3 bootstrap, and chroot handoff.
 
 set -Eeuo pipefail
 
@@ -18,6 +18,8 @@ ROOT_PART=""
 HOME_PART=""
 BOOT_PART_SIZE="1GiB"
 ROOT_PART_SIZE="40GiB"
+STAGE3_URL=""
+TARGET_MNT="/mnt/gentoo"
 
 on_error() {
   local code=$?
@@ -28,7 +30,9 @@ trap 'on_error $LINENO' ERR
 
 check_environment() {
   require_root
-  for cmd in lsblk sgdisk mkfs.fat mkfs.ext4 mount umount basestrap fstabgen artix-chroot awk; do
+  assert_gentoo "install.sh"
+
+  for cmd in lsblk sgdisk mkfs.vfat mkfs.ext4 mount umount tar chroot awk wget; do
     need_cmd "$cmd"
   done
 
@@ -36,17 +40,12 @@ check_environment() {
     die "UEFI firmware not detected. This installer supports UEFI only."
   fi
 
-  if [[ ! -f /etc/artix-release ]]; then
-    log_warn "This does not look like an Artix live environment (/etc/artix-release missing)."
-    confirm "Continue anyway?" || die "Aborted by user."
-  fi
-
   [[ -f "$CONFIG_FILE" ]] || die "Missing config.toml at: $CONFIG_FILE"
 }
 
 load_or_prompt_settings() {
   local default_username="oz"
-  local default_hostname="desktop"
+  local default_hostname="gentoo"
   local default_root_password="wizard"
   local default_user_password="wizard"
   local default_timezone="America/New_York"
@@ -87,6 +86,7 @@ load_or_prompt_settings() {
   "keymap": "${keymap}",
   "boot_part_size": "${default_boot_part_size}",
   "root_part_size": "${default_root_part_size}",
+  "stage3_url": "",
   "additional_packages": []
 }
 JSON
@@ -97,8 +97,10 @@ JSON
 
   BOOT_PART_SIZE="$(json_get_string "$SETTINGS_FILE" "boot_part_size")"
   ROOT_PART_SIZE="$(json_get_string "$SETTINGS_FILE" "root_part_size")"
+  STAGE3_URL="$(json_get_string "$SETTINGS_FILE" "stage3_url")"
   BOOT_PART_SIZE="${BOOT_PART_SIZE:-$default_boot_part_size}"
   ROOT_PART_SIZE="${ROOT_PART_SIZE:-$default_root_part_size}"
+
   log_info "Partition sizes from settings: BOOT=${BOOT_PART_SIZE}, ROOT=${ROOT_PART_SIZE}, HOME=remaining"
 }
 
@@ -146,43 +148,72 @@ partition_drive() {
 
 format_and_mount() {
   log_info "Formatting partitions"
-  mkfs.fat -F32 -n BOOT "$EFI_PART"
+  mkfs.vfat -F32 -n BOOT "$EFI_PART"
   mkfs.ext4 -F -L ROOT "$ROOT_PART"
   mkfs.ext4 -F -L HOME "$HOME_PART"
 
-  log_info "Mounting target filesystem at /mnt"
-  mount "$ROOT_PART" /mnt
-  mkdir -p /mnt/boot /mnt/home
-  mount "$EFI_PART" /mnt/boot
-  mount "$HOME_PART" /mnt/home
+  log_info "Mounting target filesystem at ${TARGET_MNT}"
+  mkdir -p "$TARGET_MNT"
+  mount "$ROOT_PART" "$TARGET_MNT"
+  mkdir -p "$TARGET_MNT/boot" "$TARGET_MNT/home"
+  mount "$EFI_PART" "$TARGET_MNT/boot"
+  mount "$HOME_PART" "$TARGET_MNT/home"
 
   log_ok "Mount layout prepared"
 }
 
-install_base_system() {
-  local packages
-  mapfile -t packages < <(parse_toml_packages "$CONFIG_FILE")
-  if [[ ${#packages[@]} -eq 0 ]]; then
-    die "No packages parsed from config.toml"
+download_and_extract_stage3() {
+  local stage3_tarball="/tmp/stage3-amd64.tar.xz"
+  local default_stage3_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc/stage3-amd64-openrc.tar.xz"
+
+  if [[ -z "$STAGE3_URL" ]]; then
+    STAGE3_URL="$default_stage3_url"
+    log_warn "stage3_url not set in settings.json; using default OpenRC stage3 URL."
   fi
 
-  log_info "Installing base system with basestrap (${#packages[@]} packages)"
-  basestrap /mnt "${packages[@]}"
+  log_info "Downloading stage3 tarball"
+  wget -O "$stage3_tarball" "$STAGE3_URL"
 
-  log_info "Generating fstab"
-  fstabgen -U /mnt > /mnt/etc/fstab
+  log_info "Extracting stage3 into ${TARGET_MNT}"
+  tar xpf "$stage3_tarball" --xattrs-include='*.*' --numeric-owner -C "$TARGET_MNT"
 
+  cp -L /etc/resolv.conf "$TARGET_MNT/etc/resolv.conf"
+}
+
+generate_fstab() {
+  log_info "Generating ${TARGET_MNT}/etc/fstab"
+  cat > "${TARGET_MNT}/etc/fstab" <<FSTAB
+# <fs>                                 <mountpoint> <type>  <opts>         <dump/pass>
+$(blkid -s UUID -o value "$ROOT_PART") /     ext4  noatime       0 1
+$(blkid -s UUID -o value "$EFI_PART")  /boot vfat  noatime       0 2
+$(blkid -s UUID -o value "$HOME_PART") /home ext4  noatime       0 2
+FSTAB
+
+  sed -i 's#^#UUID=#' "${TARGET_MNT}/etc/fstab"
+}
+
+copy_installer_files() {
   log_info "Copying installer files into new system"
-  install -m 0644 "$CONFIG_FILE" /mnt/root/config.toml
-  install -m 0644 "$SETTINGS_FILE" /mnt/root/settings.json
-  install -m 0755 "$SCRIPT_DIR/lib.sh" /mnt/root/lib.sh
-  install -m 0755 "$SCRIPT_DIR/chroot.sh" /mnt/root/chroot.sh
-  install -m 0755 "$SCRIPT_DIR/post-install.sh" /mnt/root/post-install.sh
+  install -m 0644 "$CONFIG_FILE" "$TARGET_MNT/root/config.toml"
+  install -m 0644 "$SETTINGS_FILE" "$TARGET_MNT/root/settings.json"
+  install -m 0755 "$SCRIPT_DIR/lib.sh" "$TARGET_MNT/root/lib.sh"
+  install -m 0755 "$SCRIPT_DIR/chroot.sh" "$TARGET_MNT/root/chroot.sh"
+  install -m 0755 "$SCRIPT_DIR/post-install.sh" "$TARGET_MNT/root/post-install.sh"
+}
+
+prepare_chroot_mounts() {
+  mount --types proc /proc "$TARGET_MNT/proc"
+  mount --rbind /sys "$TARGET_MNT/sys"
+  mount --make-rslave "$TARGET_MNT/sys"
+  mount --rbind /dev "$TARGET_MNT/dev"
+  mount --make-rslave "$TARGET_MNT/dev"
+  mount --bind /run "$TARGET_MNT/run"
+  mount --make-slave "$TARGET_MNT/run"
 }
 
 run_chroot_stage() {
   log_info "Entering chroot and launching stage 2..."
-  artix-chroot /mnt /root/chroot.sh
+  chroot "$TARGET_MNT" /bin/bash /root/chroot.sh
   log_ok "Stage 2 complete."
 }
 
@@ -190,7 +221,7 @@ finish_message() {
   log_ok "Installation stages 1 and 2 finished successfully."
   echo
   echo "Next steps:"
-  echo "  1) umount -R /mnt"
+  echo "  1) umount -R ${TARGET_MNT}"
   echo "  2) reboot"
   echo "  3) log in as your new user"
   echo "  4) run: ~/post-install.sh"
@@ -203,7 +234,10 @@ main() {
   show_disks_and_choose
   partition_drive
   format_and_mount
-  install_base_system
+  download_and_extract_stage3
+  generate_fstab
+  copy_installer_files
+  prepare_chroot_mounts
   run_chroot_stage
   finish_message
 }
