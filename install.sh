@@ -190,15 +190,33 @@ format_and_mount() {
 
 download_and_extract_stage3() {
   local stage3_tarball="/tmp/stage3-amd64.tar.xz"
-  local default_stage3_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc/stage3-amd64-openrc.tar.xz"
+  local stage3_base_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc"
+  local stage3_latest_index_url="${stage3_base_url}/latest-stage3-amd64-openrc.txt"
+  local default_stage3_url=""
+  local latest_stage3_relpath=""
+
+  latest_stage3_relpath="$(wget -qO- "$stage3_latest_index_url" | awk '!/^[[:space:]]*#/ && NF {print $1; exit}' || true)"
+  if [[ -n "$latest_stage3_relpath" ]]; then
+    default_stage3_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/${latest_stage3_relpath}"
+  else
+    # Fallback kept for resilience if index parsing fails.
+    default_stage3_url="${stage3_base_url}/stage3-amd64-openrc.tar.xz"
+    log_warn "Could not parse ${stage3_latest_index_url}; using fallback stage3 filename."
+  fi
 
   if [[ -z "$STAGE3_URL" ]]; then
     STAGE3_URL="$default_stage3_url"
-    log_warn "stage3_url not set in settings.json; using default OpenRC stage3 URL."
+    log_warn "stage3_url not set in settings.json; using latest OpenRC stage3 URL."
   fi
 
-  log_info "Downloading stage3 tarball"
-  wget -O "$stage3_tarball" "$STAGE3_URL"
+  log_info "Validating stage3 URL"
+  wget --spider "$STAGE3_URL"
+
+  log_info "Downloading stage3 tarball from: $STAGE3_URL"
+  wget --tries=3 --waitretry=2 -O "$stage3_tarball" "$STAGE3_URL"
+
+  log_info "Verifying downloaded stage3 archive"
+  tar -tf "$stage3_tarball" >/dev/null
 
   log_info "Extracting stage3 into ${TARGET_MNT}"
   tar xpf "$stage3_tarball" --xattrs-include='*.*' --numeric-owner -C "$TARGET_MNT"
