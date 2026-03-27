@@ -32,7 +32,7 @@ check_environment() {
   require_root
   assert_gentoo "install.sh"
 
-  for cmd in lsblk sgdisk mkfs.vfat mkfs.ext4 mount umount tar chroot awk wget; do
+  for cmd in lsblk sgdisk mkfs.vfat mkfs.ext4 mount umount tar chroot awk wget udevadm; do
     need_cmd "$cmd"
   done
 
@@ -142,13 +142,39 @@ partition_drive() {
     HOME_PART="${TARGET_DRIVE}3"
   fi
 
+  # Allow the kernel/udev a moment to expose newly created partitions.
+  udevadm settle || true
+  for _ in {1..10}; do
+    if [[ -b "$EFI_PART" && -b "$ROOT_PART" && -b "$HOME_PART" ]]; then
+      break
+    fi
+    partprobe "$TARGET_DRIVE" || true
+    sleep 1
+  done
+
   [[ -b "$EFI_PART" && -b "$ROOT_PART" && -b "$HOME_PART" ]] || die "Partition devices not found after partitioning."
   log_ok "Partitions created: $EFI_PART, $ROOT_PART, $HOME_PART"
 }
 
 format_and_mount() {
   log_info "Formatting partitions"
-  mkfs.vfat -F32 -n BOOT "$EFI_PART"
+
+  # In some live environments the partition table appears first, but mkfs.vfat
+  # can still race with udev and fail with exit code 1.
+  local attempt=0
+  local fat32_done=0
+  for attempt in {1..5}; do
+    if mkfs.vfat -F32 -n BOOT "$EFI_PART"; then
+      fat32_done=1
+      break
+    fi
+    log_warn "Failed to format $EFI_PART as FAT32 (attempt ${attempt}/5). Retrying..."
+    udevadm settle || true
+    partprobe "$TARGET_DRIVE" || true
+    sleep 1
+  done
+  [[ "$fat32_done" -eq 1 ]] || die "Unable to format EFI partition: $EFI_PART"
+
   mkfs.ext4 -F -L ROOT "$ROOT_PART"
   mkfs.ext4 -F -L HOME "$HOME_PART"
 
