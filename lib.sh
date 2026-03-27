@@ -78,3 +78,12 @@ parse_toml_packages() {
 require_root() {
   [[ "${EUID}" -eq 0 ]] || die "This script must be run as root."
 }
+
+is_gentoo() {
+  [[ -f /etc/gentoo-release ]]
+}
+
+assert_gentoo() {
+  local context="${1:-this installer}"
+  is_gentoo || die "${context} currently supports Gentoo only."
+}

@@ -1,90 +1,48 @@
-# Omakase Artix package manifest (TOML)
-#
-# Notes:
-# - Keep package names quoted and comma-separated.
-# - Each list is merged by scripts into one install set.
-# - Safe to add/remove packages before installation.
+# Omakase Gentoo package manifest (TOML)
+# Each list is merged by scripts into one install set.
 
-# Base system and firmware essentials
+# Core system packages
 base = [
-  "base",
-  "base-devel",
-  "linux-firmware",
-  "elogind",
-  "openrc",
-  "openrc-base"
+  "sys-kernel/linux-firmware",
+  "sys-apps/openrc",
+  "app-admin/sudo",
+  "app-admin/doas",
+  "sys-fs/e2fsprogs",
+  "sys-fs/dosfstools",
+  "sys-boot/grub",
+  "sys-boot/efibootmgr"
 ]
 
-# Kernel stack (Zen kernel as requested)
+# Kernel strategy (distribution kernel)
 kernel = [
-  "linux-zen",
-  "linux-zen-headers"
+  "sys-kernel/gentoo-kernel-bin"
 ]
 
-# Bootloader and EFI tooling
-bootloader = [
-  "grub",
-  "efibootmgr"
-]
-
-# Networking, remote access, and core connectivity
+# Networking and remote access
 network = [
-  "networkmanager",
-  "networkmanager-openrc",
-  "openssh",
-  "wpa_supplicant",
-  "dhcpcd"
+  "net-misc/networkmanager",
+  "net-misc/openssh",
+  "net-wireless/wpa_supplicant",
+  "net-misc/dhcpcd"
 ]
 
-# Display manager stack
-# lightdm-openrc provides OpenRC service integration.
-display = [
-  "lightdm",
-  "lightdm-gtk-greeter",
-  "lightdm-openrc"
-]
-
-# XLibre server stack (replaces classic Xorg server components)
-# Keep these together to avoid mixed Xorg/XLibre conflicts.
-xlibre = [
-  "xlibre-xserver",
-  "xlibre-xserver-common",
-  "xlibre-video-amdgpu",
-  "xlibre-video-ati",
-  "xlibre-video-vesa",
-  "xlibre-video-fbdev",
-  "xlibre-input-libinput"
-]
-
-# AMD graphics and Vulkan userspace (including 32-bit libs for Steam/Wine-like apps)
-drivers = [
-  "mesa",
-  "vulkan-radeon",
-  "lib32-mesa",
-  "lib32-vulkan-radeon"
-]
-
-# Session/basic desktop quality-of-life pieces
-# We intentionally ship a minimal suckless desktop stack and build
-# dwm/dmenu/st from source during chroot stage.
-desktop = [
-  "xorg-xinit",
-  "libx11",
-  "libxft",
-  "libxinerama"
+# Graphics stack for AMD
+x11 = [
+  "x11-base/xorg-server",
+  "x11-apps/xinit",
+  "x11-drivers/xf86-video-amdgpu",
+  "media-libs/mesa",
+  "media-libs/libglvnd",
+  "media-libs/vulkan-loader"
 ]
 
 # Everyday command-line tools/utilities
 utils = [
-  "sudo",
-  "doas",
-  "git",
-  "curl",
-  "wget",
-  "yt-dlp",
-  "nano",
-  "bash-completion",
-  "man-db",
-  "man-pages",
-  "less"
+  "dev-vcs/git",
+  "net-misc/curl",
+  "net-misc/wget",
+  "app-editors/nano",
+  "app-shells/bash-completion",
+  "app-text/man-db",
+  "sys-apps/less"
 ]

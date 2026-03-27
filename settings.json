@@ -1,6 +1,6 @@
 {
   "username": "oz",
-  "hostname": "desktop",
+  "hostname": "gentoo",
   "root_password": "wizard",
   "user_password": "wizard",
   "timezone": "America/New_York",
@@ -8,5 +8,6 @@
   "keymap": "us",
   "boot_part_size": "1GiB",
   "root_part_size": "40GiB",
+  "stage3_url": "",
   "additional_packages": []
 }
