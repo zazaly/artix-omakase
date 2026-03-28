@@ -162,6 +162,14 @@ partition_drive() {
   log_ok "Partitions created: $EFI_PART, $ROOT_PART, $HOME_PART"
 }
 
+pause_for_manual_check() {
+  local message="$1"
+  echo
+  log_warn "$message"
+  read -r -n 1 -s -p "Press any key to continue..." _
+  echo
+}
+
 unmount_target_drive_partitions() {
   local part
   local mountpoint
@@ -359,7 +367,9 @@ main() {
   load_or_prompt_settings
   show_disks_and_choose
   partition_drive
+  pause_for_manual_check "Paused after partitioning. Verify partition layout before continuing."
   format_and_mount
+  pause_for_manual_check "Paused after mounting. Verify mounts before continuing."
   download_and_extract_stage3
   generate_fstab
   copy_installer_files
