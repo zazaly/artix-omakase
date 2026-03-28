@@ -162,6 +162,26 @@ partition_drive() {
   log_ok "Partitions created: $EFI_PART, $ROOT_PART, $HOME_PART"
 }
 
+unmount_target_drive_partitions() {
+  local part
+  local mountpoint
+
+  for part in "$EFI_PART" "$ROOT_PART" "$HOME_PART"; do
+    [[ -n "$part" && -b "$part" ]] || continue
+
+    if grep -q "^${part}[[:space:]]" /proc/swaps; then
+      log_info "Disabling swap on ${part}"
+      swapoff "$part" || true
+    fi
+
+    while mountpoint="$(findmnt -rn -S "$part" -o TARGET 2>/dev/null | head -n1)"; do
+      [[ -n "$mountpoint" ]] || break
+      log_info "Unmounting ${part} from ${mountpoint}"
+      umount "$mountpoint" || umount -l "$mountpoint" || true
+    done
+  done
+}
+
 format_and_mount() {
   log_info "Formatting partitions"
 
