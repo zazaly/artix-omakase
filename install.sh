@@ -32,7 +32,7 @@ check_environment() {
   require_root
   assert_gentoo "install.sh"
 
-  for cmd in lsblk sgdisk mkfs.vfat mkfs.ext4 mount umount tar chroot awk wget udevadm; do
+  for cmd in lsblk sgdisk mkfs.vfat mkfs.ext4 mount umount tar chroot awk wget udevadm wipefs findmnt swapoff; do
     need_cmd "$cmd"
   done
 
@@ -133,9 +133,9 @@ partition_drive() {
   sgdisk --clear "$TARGET_DRIVE"
 
   log_info "Creating GPT partitions"
-  sgdisk -n 1:1MiB:+"${BOOT_PART_SIZE}" -t 1:EF00 -c 1:BOOT "$TARGET_DRIVE"
-  sgdisk -n 2:0:+"${ROOT_PART_SIZE}" -t 2:8300 -c 2:ROOT "$TARGET_DRIVE"
-  sgdisk -n 3:0:0 -t 3:8300 -c 3:HOME "$TARGET_DRIVE"
+  sgdisk -n 1:1MiB:+"${BOOT_PART_SIZE}" -t 1:EF00 -c 1:BOOT "$TARGET_DRIVE" >/dev/null 2>&1
+  sgdisk -n 2:0:+"${ROOT_PART_SIZE}" -t 2:8300 -c 2:ROOT "$TARGET_DRIVE" >/dev/null 2>&1
+  sgdisk -n 3:0:0 -t 3:8300 -c 3:HOME "$TARGET_DRIVE" >/dev/null 2>&1
   partprobe "$TARGET_DRIVE" || true
 
   if [[ "$TARGET_DRIVE" =~ nvme|mmcblk ]]; then
@@ -164,6 +164,11 @@ partition_drive() {
 
 format_and_mount() {
   log_info "Formatting partitions"
+
+  unmount_target_drive_partitions
+  wipefs -af "$EFI_PART"
+  wipefs -af "$ROOT_PART"
+  wipefs -af "$HOME_PART"
 
   # In some live environments the partition table appears first, but mkfs.vfat
   # can still race with udev and fail with exit code 1.
