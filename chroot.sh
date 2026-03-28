@@ -105,7 +105,7 @@ KEYMAPCONF
 }
 
 install_packages_from_config() {
-  local packages additional
+  local packages additional filtered pkg
   mapfile -t packages < <(parse_toml_packages "$CONFIG_FILE")
   mapfile -t additional < <(json_get_additional_packages "$SETTINGS_FILE")
 
@@ -114,7 +114,20 @@ install_packages_from_config() {
     packages+=("${additional[@]}")
   fi
 
-  mapfile -t packages < <(printf '%s\n' "${packages[@]}" | awk '!seen[$0]++')
+  filtered=()
+  for pkg in "${packages[@]}"; do
+    pkg="${pkg%\"}"
+    pkg="${pkg#\"}"
+    pkg="$(printf '%s' "$pkg" | awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}')"
+    [[ -n "$pkg" ]] || continue
+    if [[ "$pkg" =~ ^[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.@:-]+$ ]]; then
+      filtered+=("$pkg")
+    else
+      log_warn "Skipping invalid package atom from config/settings: '$pkg'"
+    fi
+  done
+
+  mapfile -t packages < <(printf '%s\n' "${filtered[@]}" | awk '!seen[$0]++')
   [[ ${#packages[@]} -gt 0 ]] || die "No packages to install."
 
   log_info "Installing ${#packages[@]} packages from config.toml"
