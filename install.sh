@@ -314,8 +314,33 @@ prepare_chroot_mounts() {
 
 run_chroot_stage() {
   log_info "Entering chroot and launching stage 2..."
-  chroot "$TARGET_MNT" /bin/bash /root/chroot.sh
+  if ! chroot "$TARGET_MNT" /bin/bash /root/chroot.sh; then
+    log_error "Automatic chroot transition failed."
+    print_manual_chroot_instructions
+    return 1
+  fi
   log_ok "Stage 2 complete."
+}
+
+print_manual_chroot_instructions() {
+  cat <<EOF
+
+Manual recovery (run these from the live environment as root):
+  mount --types proc /proc ${TARGET_MNT}/proc
+  mount --rbind /sys ${TARGET_MNT}/sys
+  mount --make-rslave ${TARGET_MNT}/sys
+  mount --rbind /dev ${TARGET_MNT}/dev
+  mount --make-rslave ${TARGET_MNT}/dev
+  mount --bind /run ${TARGET_MNT}/run
+  mount --make-slave ${TARGET_MNT}/run
+  chroot ${TARGET_MNT} /bin/bash
+  /root/chroot.sh
+
+After chroot stage succeeds:
+  exit
+  umount -R ${TARGET_MNT}
+  reboot
+EOF
 }
 
 finish_message() {
