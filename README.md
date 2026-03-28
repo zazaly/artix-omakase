@@ -100,6 +100,35 @@ This project uses a 3-stage workflow:
 - Installation is intended for clean-disk scenarios.
 - Always verify the selected drive (`/dev/sdX`, `/dev/nvmeXn1`) before confirming wipe.
 
+## Troubleshooting: dist-kernel post-install failures
+
+If `sys-kernel/gentoo-kernel-bin` fails during `pkg_postinst` with a message like:
+
+```text
+Kernel install failed, please fix the problems and run emerge --config
+```
+
+the usual cause is that `/boot` is not mounted correctly inside chroot. The installer now validates `/boot` before running bootloader/kernel post-install steps, but you can also recover manually:
+
+```bash
+mount --types proc /proc /mnt/gentoo/proc
+mount --rbind /sys /mnt/gentoo/sys
+mount --make-rslave /mnt/gentoo/sys
+mount --rbind /dev /mnt/gentoo/dev
+mount --make-rslave /mnt/gentoo/dev
+mount --bind /run /mnt/gentoo/run
+mount --make-slave /mnt/gentoo/run
+chroot /mnt/gentoo /bin/bash
+findmnt /boot
+emerge --config sys-kernel/gentoo-kernel-bin
+```
+
+If your system uses `sys-kernel/gentoo-kernel` instead, run:
+
+```bash
+emerge --config sys-kernel/gentoo-kernel
+```
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
