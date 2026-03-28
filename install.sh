@@ -127,36 +127,10 @@ show_disks_and_choose() {
   log_info "Selected drive: $TARGET_DRIVE"
 }
 
-unmount_target_drive_partitions() {
-  local part
-
-  # Unmount any existing mounts from the selected target drive.
-  while read -r part; do
-    [[ -n "$part" ]] || continue
-    if findmnt -rn -S "$part" >/dev/null 2>&1; then
-      log_info "Unmounting $part"
-      umount -R "$part" || die "Failed to unmount $part"
-    fi
-  done < <(lsblk -lnpo NAME "$TARGET_DRIVE" | tail -n +2 | sort -r)
-
-  # Ensure no swap partition on the target drive remains active.
-  while read -r part _; do
-    [[ -n "$part" ]] || continue
-    if [[ "$part" == "$TARGET_DRIVE"* ]]; then
-      log_info "Disabling swap on $part"
-      swapoff "$part" || die "Failed to disable swap on $part"
-    fi
-  done < /proc/swaps
-
-  udevadm settle || true
-}
-
 partition_drive() {
-  unmount_target_drive_partitions
-
   log_info "Deleting all existing partitions on $TARGET_DRIVE"
-  sgdisk --zap-all "$TARGET_DRIVE" >/dev/null 2>&1
-  sgdisk --clear "$TARGET_DRIVE" >/dev/null 2>&1
+  sgdisk --zap-all "$TARGET_DRIVE"
+  sgdisk --clear "$TARGET_DRIVE"
 
   log_info "Creating GPT partitions"
   sgdisk -n 1:1MiB:+"${BOOT_PART_SIZE}" -t 1:EF00 -c 1:BOOT "$TARGET_DRIVE" >/dev/null 2>&1

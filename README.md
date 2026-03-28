@@ -6,7 +6,7 @@ A staged, beginner-friendly, **UEFI-only** Gentoo installer designed for testing
 
 This repo is written for people who want a reproducible Gentoo install flow without memorizing every handbook step. It is still a destructive installer, so treat it as an automation aid rather than a “one-click” tool.
 
-If you are preparing a real machine (for example: **Ryzen 7 5700X (8 cores)** + **Radeon RX 6900 XT** + **B550M** board), do a quick Portage/bootstrap sanity pass from the live environment before running `install.sh`:
+If you are preparing a real machine (for example: **Ryzen** + **Radeon RX**), do a quick Portage/bootstrap sanity pass from the live environment before running `install.sh`:
 
 ```bash
 emerge --sync
