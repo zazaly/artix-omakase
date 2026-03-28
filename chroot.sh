@@ -171,7 +171,10 @@ install_packages_from_config() {
 
 validate_boot_mountpoint() {
   if ! findmnt /boot >/dev/null 2>&1; then
-    die "/boot is not mounted inside chroot. Mount the EFI partition at /boot and retry."
+    log_warn "/boot is not mounted inside chroot. Attempting to mount it from /etc/fstab."
+    if ! mount /boot; then
+      die "/boot is not mounted inside chroot. Mount the EFI partition at /boot and retry."
+    fi
   fi
 
   if [[ ! -d /boot ]] || [[ ! -w /boot ]]; then
@@ -251,9 +254,9 @@ main() {
   configure_portage
   configure_portage_licenses
   configure_system_basics
+  validate_boot_mountpoint
   install_packages_from_config
   ensure_bootloader_tools
-  validate_boot_mountpoint
   configure_dist_kernel_if_present
   configure_bootloader
   enable_services
