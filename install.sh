@@ -173,8 +173,17 @@ pause_for_manual_check() {
 unmount_target_drive_partitions() {
   local part
   local mountpoint
+  local mounted_targets
 
-  for part in "$EFI_PART" "$ROOT_PART" "$HOME_PART"; do
+  if [[ -d "$TARGET_MNT" ]]; then
+    mapfile -t mounted_targets < <(findmnt -Rno TARGET "$TARGET_MNT" 2>/dev/null | awk 'NF' | sort -r)
+    for mountpoint in "${mounted_targets[@]}"; do
+      log_info "Unmounting ${mountpoint}"
+      umount "$mountpoint" || umount -l "$mountpoint" || die "Failed to unmount ${mountpoint}"
+    done
+  fi
+
+  for part in "$HOME_PART" "$ROOT_PART" "$EFI_PART"; do
     [[ -n "$part" && -b "$part" ]] || continue
 
     if grep -q "^${part}[[:space:]]" /proc/swaps; then
@@ -185,9 +194,19 @@ unmount_target_drive_partitions() {
     while mountpoint="$(findmnt -rn -S "$part" -o TARGET 2>/dev/null | head -n1)"; do
       [[ -n "$mountpoint" ]] || break
       log_info "Unmounting ${part} from ${mountpoint}"
-      umount "$mountpoint" || umount -l "$mountpoint" || true
+      umount "$mountpoint" || umount -l "$mountpoint" || die "Failed to unmount ${part} from ${mountpoint}"
     done
   done
+}
+
+show_target_mount_layout() {
+  log_info "Currently mounted partitions under ${TARGET_MNT}:"
+  findmnt -Rno SOURCE,TARGET,FSTYPE,OPTIONS "$TARGET_MNT" 2>/dev/null | sed 's/^/  /' || true
+}
+
+pause_after_mount_step() {
+  local mount_desc="$1"
+  pause_for_manual_check "Mounted ${mount_desc}. Verify it looks correct before continuing."
 }
 
 format_and_mount() {
@@ -220,9 +239,12 @@ format_and_mount() {
   log_info "Mounting target filesystem at ${TARGET_MNT}"
   mkdir -p "$TARGET_MNT"
   mount "$ROOT_PART" "$TARGET_MNT"
+  pause_after_mount_step "${ROOT_PART} at ${TARGET_MNT}"
   mkdir -p "$TARGET_MNT/boot" "$TARGET_MNT/home"
   mount "$EFI_PART" "$TARGET_MNT/boot"
+  pause_after_mount_step "${EFI_PART} at ${TARGET_MNT}/boot"
   mount "$HOME_PART" "$TARGET_MNT/home"
+  pause_after_mount_step "${HOME_PART} at ${TARGET_MNT}/home"
 
   log_ok "Mount layout prepared"
 }
@@ -369,6 +391,7 @@ main() {
   partition_drive
   pause_for_manual_check "Paused after partitioning. Verify partition layout before continuing."
   format_and_mount
+  show_target_mount_layout
   pause_for_manual_check "Paused after mounting. Verify mounts before continuing."
   download_and_extract_stage3
   generate_fstab
