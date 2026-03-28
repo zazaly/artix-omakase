@@ -29,12 +29,22 @@ check_chroot_environment() {
   require_root
   assert_gentoo "chroot.sh"
 
-  for cmd in emerge env-update source eselect locale-gen ln hwclock grub-install grub-mkconfig rc-update useradd chpasswd awk; do
+  for cmd in emerge env-update source eselect locale-gen ln hwclock rc-update useradd chpasswd awk; do
     need_cmd "$cmd"
   done
 
   [[ -f "$CONFIG_FILE" ]] || die "Missing $CONFIG_FILE"
   [[ -f "$SETTINGS_FILE" ]] || die "Missing $SETTINGS_FILE"
+}
+
+ensure_bootloader_tools() {
+  if ! command -v grub-install >/dev/null 2>&1 || ! command -v grub-mkconfig >/dev/null 2>&1; then
+    log_info "GRUB tools missing; installing sys-boot/grub and sys-boot/efibootmgr"
+    emerge --ask=n sys-boot/grub sys-boot/efibootmgr
+  fi
+
+  need_cmd grub-install
+  need_cmd grub-mkconfig
 }
 
 load_settings() {
@@ -162,6 +172,7 @@ main() {
   configure_portage
   configure_system_basics
   install_packages_from_config
+  ensure_bootloader_tools
   configure_bootloader
   enable_services
   configure_privilege_escalation
