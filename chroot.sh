@@ -92,8 +92,11 @@ HOSTS
   eselect locale set "$LOCALE" || true
 
   env-update
+  # Some profile snippets may assume variables exist and can fail under `set -u`.
   # shellcheck disable=SC1091
+  set +u
   source /etc/profile
+  set -u
 
   log_info "Configuring keymap: $KEYMAP"
   cat > /etc/conf.d/keymaps <<KEYMAPCONF
