@@ -51,8 +51,13 @@ json_get_additional_packages() {
   fi
 }
 
-# Parse package groups from config.toml lines of the form:
-# group = ["pkg1", "pkg2"]
+# Parse package groups from config.toml arrays, supporting both inline and
+# multi-line forms:
+#   group = ["pkg1", "pkg2"]
+#   group = [
+#     "pkg1",
+#     "pkg2"
+#   ]
 # Returns a newline-separated package list, unique and sorted in input order.
 parse_toml_packages() {
   local file="$1"
@@ -60,16 +65,31 @@ parse_toml_packages() {
 
   awk '
     /^[[:space:]]*#/ { next }
-    /^[[:space:]]*[a-zA-Z0-9_]+[[:space:]]*=[[:space:]]*\[/ {
+    {
       line=$0
-      # strip everything before first [ and after last ]
-      sub(/^[^\[]*\[/, "", line)
-      sub(/\][^\]]*$/, "", line)
-      gsub(/"/, "", line)
-      n=split(line, arr, /,[[:space:]]*/)
-      for (i=1; i<=n; i++) {
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", arr[i])
-        if (arr[i] != "") print arr[i]
+
+      # Start of an array value assignment.
+      if (!in_array && line ~ /^[[:space:]]*[a-zA-Z0-9_]+[[:space:]]*=[[:space:]]*\[/) {
+        in_array=1
+        sub(/^[^\[]*\[/, "", line)
+      }
+
+      if (in_array) {
+        # Remove trailing comments, then parse tokens separated by commas.
+        sub(/[[:space:]]*#.*/, "", line)
+        has_close = (line ~ /\]/)
+        sub(/\][^\]]*$/, "", line)
+        gsub(/"/, "", line)
+
+        n=split(line, arr, /,[[:space:]]*/)
+        for (i=1; i<=n; i++) {
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", arr[i])
+          if (arr[i] != "") print arr[i]
+        }
+
+        if (has_close) {
+          in_array=0
+        }
       }
     }
   ' "$file" | awk '!seen[$0]++'
