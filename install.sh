@@ -226,7 +226,12 @@ download_and_extract_stage3() {
   local default_stage3_url=""
   local latest_stage3_relpath=""
 
-  latest_stage3_relpath="$(wget -qO- "$stage3_latest_index_url" | awk '!/^[[:space:]]*#/ && NF {print $1; exit}' || true)"
+  latest_stage3_relpath="$(wget -qO- "$stage3_latest_index_url" | awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*-----BEGIN/ { next }
+    /^[[:space:]]*Hash:/ { next }
+    /stage3-amd64-openrc[[:graph:]]*\.tar\.xz([[:space:]]|$)/ { print $1; exit }
+  ' || true)"
   if [[ -n "$latest_stage3_relpath" ]]; then
     default_stage3_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/${latest_stage3_relpath}"
   else
