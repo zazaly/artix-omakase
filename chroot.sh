@@ -72,6 +72,22 @@ configure_portage() {
   emerge-webrsync || emerge --sync
 }
 
+configure_portage_licenses() {
+  local license_dir="/etc/portage/package.license"
+  local license_file="${license_dir}/artix-omakase"
+
+  mkdir -p "$license_dir"
+  touch "$license_file"
+
+  if grep -Eq '^sys-kernel/linux-firmware([[:space:]]+|$).*linux-fw-redistributable' "$license_file"; then
+    log_info "Portage license override for linux-firmware already present"
+    return
+  fi
+
+  log_info "Accepting linux-fw-redistributable for sys-kernel/linux-firmware"
+  echo "sys-kernel/linux-firmware linux-fw-redistributable" >> "$license_file"
+}
+
 configure_system_basics() {
   log_info "Configuring hostname"
   echo "$HOSTNAME" > /etc/hostname
@@ -186,6 +202,7 @@ main() {
   check_chroot_environment
   load_settings
   configure_portage
+  configure_portage_licenses
   configure_system_basics
   install_packages_from_config
   ensure_bootloader_tools
