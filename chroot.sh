@@ -37,10 +37,29 @@ check_chroot_environment() {
   [[ -f "$SETTINGS_FILE" ]] || die "Missing $SETTINGS_FILE"
 }
 
+emerge_with_autounmask() {
+  if [[ $# -eq 0 ]]; then
+    die "emerge_with_autounmask requires at least one package atom."
+  fi
+
+  if emerge --ask=n "$@"; then
+    return 0
+  fi
+
+  log_warn "Initial emerge failed; retrying with autounmask enabled."
+  emerge \
+    --ask=n \
+    --autounmask=y \
+    --autounmask-write=y \
+    --autounmask-continue=y \
+    --autounmask-backtrack=y \
+    "$@"
+}
+
 ensure_bootloader_tools() {
   if ! command -v grub-install >/dev/null 2>&1 || ! command -v grub-mkconfig >/dev/null 2>&1; then
     log_info "GRUB tools missing; installing sys-boot/grub and sys-boot/efibootmgr"
-    emerge --ask=n sys-boot/grub sys-boot/efibootmgr
+    emerge_with_autounmask sys-boot/grub sys-boot/efibootmgr
   fi
 
   need_cmd grub-install
@@ -147,7 +166,7 @@ install_packages_from_config() {
   [[ ${#packages[@]} -gt 0 ]] || die "No packages to install."
 
   log_info "Installing ${#packages[@]} packages from config.toml"
-  emerge --ask=n "${packages[@]}"
+  emerge_with_autounmask "${packages[@]}"
 }
 
 configure_bootloader() {
