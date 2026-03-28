@@ -6,7 +6,6 @@ base = [
   "sys-kernel/linux-firmware",
   "sys-apps/openrc",
   "app-admin/sudo",
-  "app-admin/doas",
   "sys-fs/e2fsprogs",
   "sys-fs/dosfstools",
   "sys-boot/grub",
@@ -41,7 +40,7 @@ utils = [
   "dev-vcs/git",
   "net-misc/curl",
   "net-misc/wget",
-  "app-editors/nano",
+  "app-editors/micro",
   "app-shells/bash-completion",
   "sys-apps/man-db",
   "sys-apps/less"
