@@ -169,6 +169,34 @@ install_packages_from_config() {
   emerge_with_autounmask "${packages[@]}"
 }
 
+validate_boot_mountpoint() {
+  if ! findmnt /boot >/dev/null 2>&1; then
+    die "/boot is not mounted inside chroot. Mount the EFI partition at /boot and retry."
+  fi
+
+  if [[ ! -d /boot ]] || [[ ! -w /boot ]]; then
+    die "/boot is unavailable or not writable. Fix the mount and permissions, then retry."
+  fi
+}
+
+configure_dist_kernel_if_present() {
+  local configured=0
+
+  if emerge --config sys-kernel/gentoo-kernel-bin; then
+    configured=1
+  fi
+
+  if emerge --config sys-kernel/gentoo-kernel; then
+    configured=1
+  fi
+
+  if [[ "$configured" -eq 1 ]]; then
+    log_ok "Kernel post-install hooks completed."
+  else
+    log_info "No configured dist-kernel package post-install hooks were run."
+  fi
+}
+
 configure_bootloader() {
   log_info "Installing GRUB to EFI"
   grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Gentoo
@@ -225,6 +253,8 @@ main() {
   configure_system_basics
   install_packages_from_config
   ensure_bootloader_tools
+  validate_boot_mountpoint
+  configure_dist_kernel_if_present
   configure_bootloader
   enable_services
   configure_privilege_escalation
