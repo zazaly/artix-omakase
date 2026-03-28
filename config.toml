@@ -43,6 +43,6 @@ utils = [
   "net-misc/wget",
   "app-editors/nano",
   "app-shells/bash-completion",
-  "app-text/man-db",
+  "sys-apps/man-db",
   "sys-apps/less"
 ]
