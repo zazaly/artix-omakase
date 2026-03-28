@@ -105,26 +105,32 @@ JSON
 }
 
 show_disks_and_choose() {
-  log_info "Available block devices:"
-  echo
-  lsblk -d -o NAME,SIZE,MODEL | sed '1d' | awk '{printf "  /dev/%-12s %-8s %s\n", $1, $2, substr($0, index($0,$3))}'
-  echo
+  local -a drives
+  local selection
+  local i
 
-  read -r -p "Enter target drive (example: /dev/sda or /dev/nvme0n1): " TARGET_DRIVE
-  [[ -b "$TARGET_DRIVE" ]] || die "Invalid block device: $TARGET_DRIVE"
+  mapfile -t drives < <(lsblk -dn -o NAME,TYPE | awk '$2 == "disk" {print "/dev/" $1}')
+  [[ "${#drives[@]}" -gt 0 ]] || die "No block devices detected."
 
-  log_warn "You selected: $TARGET_DRIVE"
-  log_warn "ALL DATA ON THIS DRIVE WILL BE DESTROYED."
+  log_info "Select target drive:"
+  for i in "${!drives[@]}"; do
+    printf "  %d) %s\n" "$((i + 1))" "${drives[$i]}"
+  done
 
-  read -r -p "Type the full drive path again to confirm wipe: " confirm_drive
-  [[ "$confirm_drive" == "$TARGET_DRIVE" ]] || die "Drive confirmation mismatch. Aborting."
+  read -r -p "Drive number (1-${#drives[@]}): " selection
+  [[ "$selection" =~ ^[0-9]+$ ]] || die "Selection must be a number."
+  (( selection >= 1 && selection <= ${#drives[@]} )) || die "Selection out of range."
 
-  confirm "Final confirmation: wipe and repartition $TARGET_DRIVE ?" || die "Aborted by user."
+  TARGET_DRIVE="${drives[$((selection - 1))]}"
+  [[ -b "$TARGET_DRIVE" ]] || die "Invalid block device selected: $TARGET_DRIVE"
+
+  log_info "Selected drive: $TARGET_DRIVE"
 }
 
 partition_drive() {
-  log_info "Wiping existing partition table on $TARGET_DRIVE"
+  log_info "Deleting all existing partitions on $TARGET_DRIVE"
   sgdisk --zap-all "$TARGET_DRIVE"
+  sgdisk --clear "$TARGET_DRIVE"
 
   log_info "Creating GPT partitions"
   sgdisk -n 1:1MiB:+"${BOOT_PART_SIZE}" -t 1:EF00 -c 1:BOOT "$TARGET_DRIVE"
@@ -210,13 +216,19 @@ download_and_extract_stage3() {
   fi
 
   log_info "Validating stage3 URL"
-  wget --spider "$STAGE3_URL"
+  if ! wget --spider --tries=2 --timeout=20 "$STAGE3_URL"; then
+    if [[ "$STAGE3_URL" != "$default_stage3_url" ]]; then
+      log_warn "Configured stage3_url is unreachable. Falling back to detected latest stage3 URL."
+      STAGE3_URL="$default_stage3_url"
+    fi
+    wget --spider --tries=2 --timeout=20 "$STAGE3_URL" || die "Stage3 URL is not reachable: $STAGE3_URL"
+  fi
 
   log_info "Downloading stage3 tarball from: $STAGE3_URL"
-  wget --tries=3 --waitretry=2 -O "$stage3_tarball" "$STAGE3_URL"
+  wget --tries=3 --waitretry=2 --timeout=30 -O "$stage3_tarball" "$STAGE3_URL" || die "Failed to download stage3 tarball from: $STAGE3_URL"
 
   log_info "Verifying downloaded stage3 archive"
-  tar -tf "$stage3_tarball" >/dev/null
+  tar -tf "$stage3_tarball" >/dev/null || die "Downloaded stage3 tarball is invalid: $stage3_tarball"
 
   log_info "Extracting stage3 into ${TARGET_MNT}"
   tar xpf "$stage3_tarball" --xattrs-include='*.*' --numeric-owner -C "$TARGET_MNT"
